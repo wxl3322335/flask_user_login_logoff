@@ -102,3 +102,41 @@ def logout():
 
 if __name__ == '__main__':
     app.run(debug=True)
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+ import cx_Oracle
+import pandas as pd
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def query_data(username, password, host, port, service_name, sql):
+    dsn = cx_Oracle.makedsn(host, port, service_name=service_name)
+    conn = cx_Oracle.connect(username, password, dsn=dsn)
+    df = pd.read_sql(sql, conn)
+    conn.close()
+    return df
+
+def read_data_from_oracle(instances, sqls, num_threads):
+    results = {}
+    with ThreadPoolExecutor(max_workers=num_threads) as executor:
+        futures = []
+        for instance in instances:
+            username = instance['username']
+            password = instance['password']
+            host = instance['host']
+            port = instance['port']
+            service_name = instance['service_name']
+            for sql in sqls:
+                futures.append(executor.submit(query_data, username, password, host, port, service_name, sql))
+        for future in as_completed(futures):
+            df = future.result()
+            results[(df.iloc[0]['INSTANCE_NAME'], df.iloc[0]['SQL_ID'])] = df
+    return pd.concat(results.values(), ignore_index=True)
